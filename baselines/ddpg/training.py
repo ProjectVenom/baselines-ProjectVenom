@@ -18,7 +18,6 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
     popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
-
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
     max_action = env.action_space.high
     logger.info('scaling actions by {} before executing in env'.format(max_action))
@@ -35,15 +34,27 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         saver = tf.train.Saver()
     else:
         saver = None
-    
+    saver = tf.train.Saver()
+    load = True
+    save = True
+    model_path = './models'
+
     step = 0
     episode = 0
     eval_episode_rewards_history = deque(maxlen=100)
     episode_rewards_history = deque(maxlen=100)
     with U.single_threaded_session() as sess:
+    #with tf.Session(config=tf.ConfigProto(log_device_placement=1)) as sess:
         # Prepare everything.
         agent.initialize(sess)
-        sess.graph.finalize()
+
+        if load:
+            try:
+                saver.restore(sess, model_path+"/recent.ckpt")
+            except:
+                sess.graph.finalize()
+        else:
+            sess.graph.finalize()
 
         agent.reset()
         obs = env.reset()
@@ -66,6 +77,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         epoch_actions = []
         epoch_qs = []
         epoch_episodes = 0
+        #saver.restore()
         for epoch in range(nb_epochs):
             for cycle in range(nb_epoch_cycles):
                 # Perform rollouts.
@@ -137,6 +149,10 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                             eval_episode_rewards.append(eval_episode_reward)
                             eval_episode_rewards_history.append(eval_episode_reward)
                             eval_episode_reward = 0.
+
+            saver.save(agent.sess, model_path+'/recent.ckpt')
+            step_num = (1+epoch)*nb_epoch_cycles
+            saver.save(agent.sess, model_path+'/step_'+str(step_num)+'.ckpt')
 
             # Log stats.
             epoch_train_duration = time.time() - epoch_start_time

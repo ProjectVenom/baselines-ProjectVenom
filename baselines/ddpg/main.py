@@ -16,18 +16,27 @@ import gym
 import tensorflow as tf
 from mpi4py import MPI
 
+from baselines.AirSimEnv import AirSimEnv
+from baselines.AirSimCenter import AirSimCenter
+
 def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0: logger.set_level(logger.DISABLED)
 
     # Create envs.
-    env = gym.make(env_id)
+    if env_id == 'AirSim':
+        env = AirSimCenter()
+    else:
+        env = gym.make(env_id)
     env = bench.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), "%i.monitor.json"%rank))
     gym.logger.setLevel(logging.WARN)
 
     if evaluation and rank==0:
-        eval_env = gym.make(env_id)
+        if env_id == 'AirSim':
+            eval_env = AirSimEnv()
+        else:
+            eval_env = gym.make(env_id)
         eval_env = bench.Monitor(eval_env, os.path.join(logger.get_dir(), 'gym_eval'))
         env = bench.Monitor(env, None)
     else:
@@ -54,7 +63,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
             raise RuntimeError('unknown noise type "{}"'.format(current_noise_type))
 
     # Configure components.
-    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
+    memory = Memory(limit=int(1e3), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
 
@@ -82,7 +91,10 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument('--env-id', type=str, default='HalfCheetah-v1')
+    #parser.add_argument('--env-id', type=str, default='HalfCheetah-v1')
+    #parser.add_argument('--env-id', type=str, default='CarRacing-v0')
+    #parser.add_argument('--env-id', type=str, default='Pendulum-v0')
+    parser.add_argument('--env-id', type=str, default='AirSim')
     boolean_flag(parser, 'render-eval', default=False)
     boolean_flag(parser, 'layer-norm', default=True)
     boolean_flag(parser, 'render', default=False)
