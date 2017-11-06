@@ -34,7 +34,7 @@ class AirSimDisc(gym.Env):
         self.rt2 = math.sqrt(2)
         self.episodes = 0
         self.cumulative = 0.0
-        self.max_iter = 500
+        self.max_iter = 200
 
         self.t = np.matrix([-10.0, 10.0, -10.0])
         self.o = np.matrix([0.0, 0.0, 0.0])
@@ -121,7 +121,7 @@ class AirSimDisc(gym.Env):
             self.o = newO
             self.r = dO
         (x, y), target_in_front = projection(self.t, self.c, self.o, w=float(self.width), h=float(self.height))
-        print((x, y))
+        #print((x, y))
         self.v = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
         return (self.c, self.o)
@@ -281,7 +281,7 @@ class AirSimDisc(gym.Env):
         self.vT = np.matrix([0.0, 0.0, 0.0])
         self.aT = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
-        self.fps = 100.0
+        self.fps = 60.0
         self.nb_correct = 0
         #self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
         #                       self.hunter.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),

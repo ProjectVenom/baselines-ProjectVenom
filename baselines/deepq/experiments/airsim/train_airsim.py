@@ -2,8 +2,10 @@ from baselines import deepq
 from baselines.common.atari_wrappers_deprecated import wrap_dqn, ScaledFloatFrame
 import baselines.AirSimDiscPhys as AirSimDiscPhys
 from baselines.AirSimDisc import AirSimDisc
+from baselines.AirSimEnvFollow import AirSimEnv
 
 def main():
+    #env = AirSimEnv()
     env = AirSimDisc()
     #env = AirSimDiscPhys.AirSimEnv()
     #env = ScaledFloatFrame(wrap_dqn(env))
