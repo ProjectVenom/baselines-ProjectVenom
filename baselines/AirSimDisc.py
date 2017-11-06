@@ -16,10 +16,14 @@ class AirSimDisc(gym.Env):
     }
 
     def __init__(self):
-        self.client = AirSimClient(port=41451)
-        self.client.confirmConnection()
-        self.client.enableApiControl(True)
-        self.client.armDisarm(True)
+        self.hunter = AirSimClient(port=41451)
+        self.hunter.confirmConnection()
+        self.hunter.enableApiControl(True)
+        self.hunter.armDisarm(True)
+        self.target = AirSimClient(port=41450)
+        self.target.confirmConnection()
+        self.target.enableApiControl(True)
+        self.target.armDisarm(True)
         self.log_file = open('logs.txt', 'w')
         self.acc_file = open('accs.txt', 'w')
 
@@ -56,7 +60,7 @@ class AirSimDisc(gym.Env):
         # self.observation = np.concatenate([self.last_image, self.image])
         # self.action_space = spaces.Box(0.0, 1.0, shape = (4,))
         # self.action_space = spaces.Box(-0.5, 0.5, shape = (2,))
-        self.action_space = spaces.Discrete(9)
+        self.action_space = spaces.Discrete(10)
 
         # self.observation_space = spaces.Box(low=np.zeros(int(self.width),int(self.height),3), high=np.zeros(int(self.width),int(self.height),3)+255)
         self.observation_space = spaces.Box(low=np.zeros(self.observation.shape),
@@ -95,8 +99,8 @@ class AirSimDisc(gym.Env):
                                 random.normalvariate(self.v.item(1), vel_inc / self.fps),
                                 random.normalvariate(self.v.item(2), vel_inc / self.fps)]
                                )
-                dO = np.matrix([random.normalvariate(self.r.item(0), vel_inc / self.fps),
-                                random.normalvariate(self.r.item(1), rot_inc / self.fps),
+                dO = np.matrix([0,
+                                0,
                                 random.normalvariate(self.r.item(2), rot_inc / self.fps)]
                                )
                 newC = np.add(self.c, dC)
@@ -105,10 +109,10 @@ class AirSimDisc(gym.Env):
                 (x, y), target_in_front = projection(self.t, newC, newO, w=float(self.width),
                                                      h=float(self.height))
                 total_v = np.linalg.norm(dC)
-                if x <= float(self.width) * 0.95 and x >= float(self.width) * 0.05 and y <= float(
-                        self.height) * 0.95 and y >= float(self.height) * 0.05 \
+                if x <= float(self.width) * 1.1 and x >= float(self.width) * -0.1 and y <= float(
+                        self.height) * 1.1 and y >= float(self.height) * -0.1 \
                         and d > 3 and d < 30 and newC.item(2) < -2 \
-                        and total_v * self.fps <= 30 \
+                        and total_v * self.fps <= 10 \
                         and target_in_front:
                     break
                 j += 1
@@ -154,10 +158,10 @@ class AirSimDisc(gym.Env):
         # self.observation = self.image
         self.observation = np.concatenate([self.last_image, self.image])
 
-        # self.observation = self.observation.flatten()
-        # if action is not None:
-        #    a = np.array(action).flatten()
-        #    self.observation = np.concatenate([a, self.observation])
+        #self.observation = self.observation.flatten()
+        #if action is not None:
+        #   a = np.array(action).flatten()
+        #   self.observation = np.concatenate([a, self.observation])
 
         return self.observation
 
@@ -182,6 +186,16 @@ class AirSimDisc(gym.Env):
             if self.fw is None:
                 self.fw = open('./images/episode_' + str(self.episodes) + '/actions.txt', 'w')
             self.fw.write('(' + str(raw_action) + ')\n')
+
+        self.aT = np.matrix([random.normalvariate(mu=self.aT.item(0), sigma=2 / self.fps),
+                             random.normalvariate(mu=self.aT.item(0), sigma=2 / self.fps),
+                             random.normalvariate(mu=self.aT.item(0), sigma=2 / self.fps)]
+                            )
+        self.vT = self.vT + self.aT
+        norm_vT = np.linalg.norm(self.vT)
+        if norm_vT*self.fps > 9:
+            self.vT = 9.0*self.vT/(norm_vT*self.fps)
+        self.t = self.t + self.vT
 
         # An action of 0 is the NOOP
         j = 0
@@ -230,6 +244,9 @@ class AirSimDisc(gym.Env):
         self.v = dC
         self.o = newO
         self.r = dO
+
+
+
         x = 3 * x / float(self.width)
         y = 3 * y / float(self.height)
         self.last_loc = [int(x), int(y)]
@@ -261,21 +278,23 @@ class AirSimDisc(gym.Env):
         self.o = np.matrix([0.0, 0.0, 0.0])
         self.c = np.matrix([-20.0, 10.0, -10.0])
         self.v = np.matrix([0.0, 0.0, 0.0])
+        self.vT = np.matrix([0.0, 0.0, 0.0])
+        self.aT = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
-        self.fps = 60.0
+        self.fps = 100.0
         self.nb_correct = 0
-        #self.client.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
-        #                       self.client.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
+        #self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
+        #                       self.hunter.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
         #                                                math.radians(self.o.item(2))))
         self.image = None
         self.fw = None
-        # response = self.client.simGetImages([ImageRequest(0, AirSimImageType.Scene)])[0]
+        # response = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.Scene)])[0]
         # self.image = self.get_rbg(response)
 
         self.c, self.o = self.random_orientation(t)
         self._render()
-        #self.client.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
-        #                       self.client.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
+        #self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
+        #                       self.hunter.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
         #                                                math.radians(self.o.item(2))))
 
         (x, y), _ = projection(self.t, self.c, self.o, w=float(self.width), h=float(self.height))
@@ -286,12 +305,17 @@ class AirSimDisc(gym.Env):
         return self.observation
 
     def _render(self, mode='human', close=False):
-        self.client.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
-                               self.client.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
+        self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
+                               self.hunter.toQuaternion(math.radians(self.o.item(1)),
+                                                        math.radians(self.o.item(0)),
+                                                        math.radians(self.o.item(2))))
+        self.target.simSetPose(Vector3r(self.t.item(0), self.t.item(1), self.t.item(2)),
+                               self.target.toQuaternion(math.radians(self.o.item(1)),
+                                                        math.radians(self.o.item(0)),
                                                         math.radians(self.o.item(2))))
 
         self.last_image = self.image
-        responses = self.client.simGetImages([ImageRequest(0, AirSimImageType.Scene),
+        responses = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.Scene),
                                               ImageRequest(0, AirSimImageType.DepthVis)])
         if self.episodes % 500 == 0:
             if not os.path.exists('./images/episode_' + str(self.episodes) + '/'):
@@ -300,7 +324,7 @@ class AirSimDisc(gym.Env):
                 os.path.normpath('./images/episode_' + str(self.episodes) + '/' + str(self.iteration) + '.png'),
                 responses[0].image_data_uint8)
         rgb = self.get_rbg(responses[0])
-        # response = self.client.simGetImages([ImageRequest(0, AirSimImageType.DepthVis)])[0]
+        # response = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.DepthVis)])[0]
         depth = self.get_depth(responses[1])
         self.image = np.concatenate([rgb, depth], axis=2)
         # self.image = rgb

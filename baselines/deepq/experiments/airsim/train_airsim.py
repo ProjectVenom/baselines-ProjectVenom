@@ -1,10 +1,11 @@
 from baselines import deepq
 from baselines.common.atari_wrappers_deprecated import wrap_dqn, ScaledFloatFrame
+import baselines.AirSimDiscPhys as AirSimDiscPhys
 from baselines.AirSimDisc import AirSimDisc
-from baselines.AirSimCenterDisc import AirSimCenterDisc
 
 def main():
-    env = AirSimCenterDisc()
+    env = AirSimDisc()
+    #env = AirSimDiscPhys.AirSimEnv()
     #env = ScaledFloatFrame(wrap_dqn(env))
     model = deepq.models.cnn_to_mlp_custom(
         convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],
@@ -16,7 +17,7 @@ def main():
         env,
         q_func=model,
         lr=1e-4,
-        max_timesteps=500000,
+        max_timesteps=1000000,
         buffer_size=10000,
         exploration_fraction=0.1,
         exploration_final_eps=0.01,

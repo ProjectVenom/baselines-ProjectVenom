@@ -24,6 +24,9 @@ def projection(t, c, o, w=1920.0, h=1080.0, f=None):
 
     oZ = radians(-o.item(0))
     if f is None:    f = w / 2.0
+
+    if dZ == 0:
+        return (1000000,1000000,False)
     u = f * (dX / dZ)
     v = f * (dY / dZ)
 
