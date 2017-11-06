@@ -34,7 +34,7 @@ class AirSimDisc(gym.Env):
         self.rt2 = math.sqrt(2)
         self.episodes = 0
         self.cumulative = 0.0
-        self.max_iter = 100
+        self.max_iter = 500
 
         self.t = np.matrix([-10.0, 10.0, -10.0])
         self.o = np.matrix([0.0, 0.0, 0.0])
