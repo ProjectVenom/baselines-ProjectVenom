@@ -219,12 +219,18 @@ def get_session():
     """Returns recently made Tensorflow session"""
     return tf.get_default_session()
 
-
-def make_session(num_cpu):
+def make_session(num_cpu, gpu_opt=None):
     """Returns a session that will use <num_cpu> CPU's only"""
-    tf_config = tf.ConfigProto(
-        inter_op_parallelism_threads=num_cpu,
-        intra_op_parallelism_threads=num_cpu)
+    if gpu_opt is None:
+        tf_config = tf.ConfigProto(
+            inter_op_parallelism_threads=num_cpu,
+            intra_op_parallelism_threads=num_cpu)
+    else:
+        tf_config = tf.ConfigProto(
+            inter_op_parallelism_threads=num_cpu,
+            intra_op_parallelism_threads=num_cpu,
+            gpu_options=gpu_opt)
+
     return tf.Session(config=tf_config)
 
 

@@ -84,7 +84,7 @@ def learn(env,
           train_freq=1,
           batch_size=32,
           print_freq=1,
-          checkpoint_freq=10000,
+          checkpoint_freq=None,
           learning_starts=1000,
           gamma=1.0,
           target_network_update_freq=500,
@@ -165,7 +165,10 @@ def learn(env,
     """
     # Create all the functions necessary to train the model
 
-    sess = U.make_session(num_cpu=num_cpu)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6666667)
+
+    sess = U.make_session(num_cpu=num_cpu, gpu_opt=gpu_options)
+    #sess = U.make_session(num_cpu=num_cpu)
     sess.__enter__()
 
     def make_obs_ph(name):

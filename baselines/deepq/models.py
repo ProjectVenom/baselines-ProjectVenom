@@ -155,16 +155,28 @@ def GOTURN_forward(X):
     return fc8
 
 def _cnn_to_mlp_custom(convs, hiddens, dueling, inpt, num_actions, scope, reuse=False, layer_norm=False):
+    QUEUE_LEN = 4
     drop_out = True
     with tf.variable_scope(scope, reuse=reuse):
-        #R(v, o, r, rgbd) = tf.split(out, [1, 3, 3, int(out.shape[1])-7], 1)
-        #(v, o, r, rgbd) = tf.split(inpt, [1, 3, 3, int(inpt.shape[1])-7], 1)
-        rgbd = tf.reshape(inpt, [-1, 288, 256, 4])
-        #rgbd = tf.reshape(rgbd, [-1, 144, 256, 4])
-        #rgbd0 = out
-        (rgbd0, rgbd1) = tf.split(rgbd, [144, 144], 1)
-        (rgb0, depth0) = tf.split(rgbd0, [3,1], 3)
-        (rgb1, depth1) = tf.split(rgbd1, [3,1], 3)
+        #R(v, o, r, rgbd) = tf.split(inpt, [1, 3, 3, int(out.shape[1])-7], 1)
+        (v, o, r, rgbd) = tf.split(inpt, [1, 3, 3, int(inpt.shape[1])-7], 1)
+        #rgbd = inpt
+        #rgbd = tf.reshape(rgbd, [-1, 288, 256, 4])
+        rgbd = tf.reshape(rgbd, [-1, 144*QUEUE_LEN, 256, 4])
+        rgbd_queue = tf.split(rgbd, [144]*QUEUE_LEN, 1)
+        out_list = []
+        for i in range(QUEUE_LEN):
+            rgbd = rgbd_queue[i]
+            tf.divide(rgbd, 255.0)
+            (rgb, depth) = tf.split(rgbd, [3, 1], 3)
+            rgb_out = tiny_yolo(rgb)
+            depth_out = tiny_yolo(depth)
+            out_list.append(rgb_out)
+            out_list.append(depth_out)
+        conv_out = tf.concat(out_list, axis=1)
+        # added normalization for following, wasn't here or needed for successful run of detection
+        #conv_out = tf.divide(conv_out, 255.0)
+
         '''
         with tf.variable_scope("convnet"):
             for num_outputs, kernel_size, stride in convs:
@@ -198,18 +210,19 @@ def _cnn_to_mlp_custom(convs, hiddens, dueling, inpt, num_actions, scope, reuse=
                                            activation_fn=tf.nn.relu)
                 depth1 = tf.layers.batch_normalization(depth1)
             '''
-        rgb0_out = tiny_yolo(rgb0)
-        rgb1_out = tiny_yolo(rgb1)
-        depth0_out = tiny_yolo(depth0)
-        depth1_out = tiny_yolo(depth1)
+        #rgb1_out = tiny_yolo(rgb1)
+        #depth1_out = tiny_yolo(depth1)
 
         #rgb0_out = layers.flatten(rgb0)
         #rgb1_out = layers.flatten(rgb1)
         #depth0_out = layers.flatten(depth0)
         #depth1_out = layers.flatten(depth1)
         #conv_out = tf.concat([rgb0_out, depth0_out], 1)
-        conv_out = tf.concat([rgb0_out, depth0_out, rgb1_out, depth1_out], 1)
-        #conv_out = tf.concat([rgb0_out, rgb1_out], axis=1)
+
+        #conv_out = tf.concat([v, o, r, conv_out], 1)
+
+        #conv_out = tf.concat([rgb0_out, depth0_out, rgb1_out, depth1_out], axis=1)
+
         #conv_out = layers.flatten(out)
         with tf.variable_scope("action_value"):
             action_out = conv_out

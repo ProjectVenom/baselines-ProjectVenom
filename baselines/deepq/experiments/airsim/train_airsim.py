@@ -5,13 +5,13 @@ from baselines.AirSimDisc import AirSimDisc
 from baselines.AirSimEnvFollow import AirSimEnv
 
 def main():
-    #env = AirSimEnv()
-    env = AirSimDisc()
+    env = AirSimEnv()
+    #env = AirSimDisc()
     #env = AirSimDiscPhys.AirSimEnv()
     #env = ScaledFloatFrame(wrap_dqn(env))
     model = deepq.models.cnn_to_mlp_custom(
         convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],
-        hiddens=[4096, 2048],
+        hiddens=[4096, 4096, 4096],
         dueling=True
     )
     # 2,000,000 original
@@ -20,8 +20,8 @@ def main():
         q_func=model,
         lr=1e-4,
         max_timesteps=1000000,
-        buffer_size=10000,
-        exploration_fraction=0.1,
+        buffer_size=1000,
+        exploration_fraction=0.2,
         exploration_final_eps=0.01,
         train_freq=4,
         learning_starts=10000,

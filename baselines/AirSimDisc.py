@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import math, io, random
+from collections import deque
 import gym
 from gym import spaces
 from gym.utils import seeding
@@ -34,6 +35,7 @@ class AirSimDisc(gym.Env):
         self.rt2 = math.sqrt(2)
         self.episodes = 0
         self.cumulative = 0.0
+        self.queue_len = 4
         self.max_iter = 200
 
         self.t = np.matrix([-10.0, 10.0, -10.0])
@@ -42,6 +44,7 @@ class AirSimDisc(gym.Env):
         self.v = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
         self.image = None
+        self.image_queue = None
         self.iteration = 0
 
         self._render()
@@ -86,7 +89,7 @@ class AirSimDisc(gym.Env):
                 if x == self.width / 2 and y == self.height / 2:
                     break
 
-        print((x, y))
+        #print((x, y))
         for i in range(50):
             j = 0
             while True:
@@ -121,7 +124,7 @@ class AirSimDisc(gym.Env):
             self.o = newO
             self.r = dO
         (x, y), target_in_front = projection(self.t, self.c, self.o, w=float(self.width), h=float(self.height))
-        #print((x, y))
+        print((x, y))
         self.v = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
         return (self.c, self.o)
@@ -156,7 +159,9 @@ class AirSimDisc(gym.Env):
             return None
 
         # self.observation = self.image
-        self.observation = np.concatenate([self.last_image, self.image])
+        self.observation = np.concatenate(list(self.image_queue))
+        #self.observation = (self.observation.flatten())/255.0
+        #self.observation = np.concatenate([np.zeros(7,), self.observation])
 
         #self.observation = self.observation.flatten()
         #if action is not None:
@@ -281,6 +286,7 @@ class AirSimDisc(gym.Env):
         self.vT = np.matrix([0.0, 0.0, 0.0])
         self.aT = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
+        self.image_queue = None
         self.fps = 60.0
         self.nb_correct = 0
         #self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
@@ -293,9 +299,9 @@ class AirSimDisc(gym.Env):
 
         self.c, self.o = self.random_orientation(t)
         self._render()
-        #self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
-        #                       self.hunter.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
-        #                                                math.radians(self.o.item(2))))
+        self.hunter.simSetPose(Vector3r(self.c.item(0), self.c.item(1), self.c.item(2)),
+                               self.hunter.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
+                                                        math.radians(self.o.item(2))))
 
         (x, y), _ = projection(self.t, self.c, self.o, w=float(self.width), h=float(self.height))
         x = 3 * x / float(self.width)
@@ -314,21 +320,25 @@ class AirSimDisc(gym.Env):
                                                         math.radians(self.o.item(0)),
                                                         math.radians(self.o.item(2))))
 
-        self.last_image = self.image
+        #self.last_image = self.image
         responses = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.Scene),
                                               ImageRequest(0, AirSimImageType.DepthVis)])
-        if self.episodes % 500 == 0:
-            if not os.path.exists('./images/episode_' + str(self.episodes) + '/'):
-                os.makedirs('./images/episode_' + str(self.episodes) + '/')
-            AirSimClient.write_file(
-                os.path.normpath('./images/episode_' + str(self.episodes) + '/' + str(self.iteration) + '.png'),
-                responses[0].image_data_uint8)
+        #if self.episodes % 500 == 0:
+        #    if not os.path.exists('./images/episode_' + str(self.episodes) + '/'):
+        #        os.makedirs('./images/episode_' + str(self.episodes) + '/')
+        #    AirSimClient.write_file(
+        #        os.path.normpath('./images/episode_' + str(self.episodes) + '/' + str(self.iteration) + '.png'),
+        #        responses[0].image_data_uint8)
         rgb = self.get_rbg(responses[0])
         # response = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.DepthVis)])[0]
         depth = self.get_depth(responses[1])
         self.image = np.concatenate([rgb, depth], axis=2)
         # self.image = rgb
-        if self.last_image is None:
-            self.last_image = self.image
+        if self.image_queue is None:
+            #self.last_image = self.image
+            self.image_queue = deque([self.image]*self.queue_len)
+        else:
+            self.image_queue.append(self.image)
+            self.image_queue.popleft()
 
         return self.image

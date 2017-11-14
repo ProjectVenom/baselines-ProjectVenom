@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 from baselines.PythonClient import *
 from baselines.projection import *
+from collections import deque
 
 
 class AirSimEnv(gym.Env):
@@ -24,12 +25,18 @@ class AirSimEnv(gym.Env):
         self.client.enableApiControl(True)
         self.client.armDisarm(True)
 
+        self.target = AirSimClient(port=41450)
+        self.target.confirmConnection()
+        self.target.enableApiControl(True)
+        self.target.armDisarm(True)
+
         self.log_file = open('logs.txt', 'w')
         self.acc_file = open('accs.txt', 'w')
 
         self.episodes = 0
         self.fps = 60
         self.max_iter = 15*self.fps
+        self.queue_len = 4
 
         self.t = np.matrix([-10.0, 10.0, -10.0])
         self.o = np.matrix([0.0, 0.0, 0.0])
@@ -37,8 +44,11 @@ class AirSimEnv(gym.Env):
         self.v = np.matrix([0.0, 0.0, 0.0])
         self.r = np.matrix([0.0, 0.0, 0.0])
         self.image = None
+        self.image_queue = None
         self.iteration = 0
 
+        self.target.simSetPose(Vector3r(self.t.item(0), self.t.item(1), self.t.item(2)),
+                               self.client.toQuaternion(0,0,0))
         self._render()
         self.reset()
 
@@ -122,7 +132,7 @@ class AirSimEnv(gym.Env):
                     and d > 10 and d < 15 and c.item(2) < -5 \
                     and target_in_front:
                     break
-        self.last_d = d = np.linalg.norm(self.t - c)
+        self.last_d = np.linalg.norm(self.t - c)
 
         (x, y), target_in_front = projection(self.t, c, o, w=float(self.width), h=float(self.height))
         #print((x, y))
@@ -157,16 +167,12 @@ class AirSimEnv(gym.Env):
         if self.image is None:
             return None
 
-        # self.current_state = self.image
-        self.current_state = np.concatenate([self.image, self.last_image])
-        #self.current_state = self.image
-        self.current_state = (self.current_state.flatten())/128.0 - 1
-        # if action is not None:
-        #    a = np.array(action).flatten()
-        self.current_state = np.concatenate([np.array(self.v).flatten(),
-                                           np.array(self.o).flatten(),
-                                           np.array(self.r).flatten(),
-                                           self.current_state], 0)
+        self.current_state = np.concatenate(list(self.image_queue))
+        self.current_state = (self.current_state.flatten())
+        self.current_state = np.concatenate([np.array(self.v).flatten()/(10.0/self.fps),
+                                             np.array(self.o).flatten()/360.0,
+                                             np.array(self.r).flatten()/360.0,
+                                             self.current_state], 0)
 
         return self.current_state
 
@@ -189,8 +195,16 @@ class AirSimEnv(gym.Env):
         depth = self._get_depth(responses[1])
         self.image = np.concatenate([rgb, depth], axis=2)
         # self.image = rgb
-        if self.last_image is None:
-            self.last_image = self.image
+        #if self.last_image is None:
+        #    self.last_image = self.image
+
+        if self.image_queue is None:
+            #self.last_image = self.image
+            self.image_queue = deque([self.image]*self.queue_len)
+        else:
+            self.image_queue.append(self.image)
+            self.image_queue.popleft()
+
 
         return self.image
 
@@ -233,16 +247,19 @@ class AirSimEnv(gym.Env):
         max_r = 360.0
         dR = np.matrix([roll, pitch, yaw])
         self.v = self.v + acc / self.fps
-        if self.v > max_v: v = max_v
+        if self.v*self.fps > max_v: self.v = max_v/self.fps
         self.r = self.r + dR / self.fps
 
-        if self.r.item(0) > max_r: self.r = np.matrix([max_r, self.r.item(1), self.r.item(2)])
-        if self.r.item(1) > max_r: self.r = np.matrix([self.r.item(0), max_r, self.r.item(2)])
-        if self.r.item(2) > max_r: self.r = np.matrix([self.r.item(0), self.r.item(1), max_r])
+        if self.r.item(0) > max_r: self.r = np.matrix([self.r.item(0)-max_r, self.r.item(1), self.r.item(2)])
+        if self.r.item(1) > max_r: self.r = np.matrix([self.r.item(0), self.r.item(1)-max_r, self.r.item(2)])
+        if self.r.item(2) > max_r: self.r = np.matrix([self.r.item(0), self.r.item(1), self.r.item(2)-max_r])
 
         direction = np.dot(rot_mat(self.r.item(0), self.r.item(1), self.r.item(2)), np.transpose(self.c))
         direction = np.transpose(direction) / np.linalg.norm(direction)
         self.o = self.o + self.r
+        if self.o.item(0) > max_r: self.o = np.matrix([self.o.item(0)-max_r, self.o.item(1), self.o.item(2)])
+        if self.o.item(1) > max_r: self.o = np.matrix([self.o.item(0), self.o.item(1)-max_r, self.o.item(2)])
+        if self.o.item(2) > max_r: self.o = np.matrix([self.o.item(0), self.o.item(1), self.o.item(2)-max_r])
         self.c = self.c + direction * self.v
         if self.c.item(2) > -5:
             self.c = np.matrix([self.c.item(0), self.c.item(1), -5])
@@ -271,16 +288,22 @@ class AirSimEnv(gym.Env):
         #    self.reward = -1
         # else:
         #    self.reward = 0
-        self.reward = self.last_d - d
+        #self.reward = 0
+        #self.reward = (30.0/d - 30.0/self.last_d)
+        #print(self.reward)
+        self.reward = (self.last_d - d)
         self.last_d = d
+        #self.last_d = min(d, self.last_d)
         self.done = (self.iteration > self.max_iter)
+
         if x > self.width or x < 0 or y > self.height or y < 0 or d > 30:
+            print((x,y))
             self.done = True
-            self.reward = -1
+            self.reward = 0
 
         if d < 1:
             self.done = True
-            self.reward = 1
+            self.reward = 0
 
         # self.reward -= 0.1
 
@@ -293,13 +316,9 @@ class AirSimEnv(gym.Env):
                 self.fw.close()
                 self.fw = None
             self.episodes += 1
-            acc = float(self.nb_correct) / float(self.iteration)
             print(str(self.episodes) + ': ' + str(self.total_reward)+ ' Ended At: ' + str(self.reward) + ' @ ' + str(float(self.iteration)) + ' with d: '+str(d) )
             self.log_file.write(str(self.episodes) + ': ' + str(self.total_reward)+ ' Ended At: ' + str(self.reward) + ' @ ' + str(float(self.iteration))  + ' with d: '+str(d) + '\n')
-            self.log_file.write(str(self.episodes) + ': ' + str(self.total_reward) + ' @ ' + str(float(self.iteration)) + '\n')
-            print('Accuracy: ' + str(acc))
-            self.acc_file.write(str(acc) + '\n')
-            self.nb_correct = 0
+
             self.total_reward = 0
         return self.current_state, self.reward, self.done, {}
 
@@ -313,8 +332,10 @@ class AirSimEnv(gym.Env):
         self.nb_correct = 0
         self.image = None
         self.fw = None
-        self.last_d = 1000
         self.c, self.o = self._random_orientation(t)
+        self.last_d = np.linalg.norm(self.t - self.c)
+        self.target.simSetPose(Vector3r(self.t.item(0), self.t.item(1), self.t.item(2)),
+                               self.client.toQuaternion(0,0,0))
         self._render()
 
         self.current_state = self._get_obs()
