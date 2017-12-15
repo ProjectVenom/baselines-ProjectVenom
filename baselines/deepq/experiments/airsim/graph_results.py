@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import statistics
-log_file = open('./logs.txt.2pdisc', 'r')
+log_file = open('./logs.txt', 'r')
 lines = log_file.readlines()
 x = []
 y = []
@@ -11,7 +11,7 @@ last_t = []
 for line in lines:
     data = line.split(' ')
     #if True:
-    if (float(data[1]) >= -3 and float(data[1]) <= 500):
+    if (float(data[1]) >= -3 and float(data[1]) <= 20):
         x.append(int(data[0][:-1]))
         y.append(float(data[1]))
         if len(last_t) < t:

@@ -158,72 +158,24 @@ def _cnn_to_mlp_custom(convs, hiddens, dueling, inpt, num_actions, scope, reuse=
     QUEUE_LEN = 4
     drop_out = True
     with tf.variable_scope(scope, reuse=reuse):
-        #R(v, o, r, rgbd) = tf.split(inpt, [1, 3, 3, int(out.shape[1])-7], 1)
-        (v, o, r, rgbd) = tf.split(inpt, [1, 3, 3, int(inpt.shape[1])-7], 1)
+        conv_out = inpt
+        ##R(v, o, r, rgbd) = tf.split(inpt, [1, 3, 3, int(out.shape[1])-7], 1)
+        ##(v, o, r, t, c, pix, rgbd) = tf.split(inpt, [1, 3, 3, 3, 3, 2, int(inpt.shape[1])-15], 1)
         #rgbd = inpt
-        #rgbd = tf.reshape(rgbd, [-1, 288, 256, 4])
-        rgbd = tf.reshape(rgbd, [-1, 144*QUEUE_LEN, 256, 4])
-        rgbd_queue = tf.split(rgbd, [144]*QUEUE_LEN, 1)
-        out_list = []
-        for i in range(QUEUE_LEN):
-            rgbd = rgbd_queue[i]
-            tf.divide(rgbd, 255.0)
-            (rgb, depth) = tf.split(rgbd, [3, 1], 3)
-            rgb_out = tiny_yolo(rgb)
-            depth_out = tiny_yolo(depth)
-            out_list.append(rgb_out)
-            out_list.append(depth_out)
-        conv_out = tf.concat(out_list, axis=1)
-        # added normalization for following, wasn't here or needed for successful run of detection
-        #conv_out = tf.divide(conv_out, 255.0)
-
-        '''
-        with tf.variable_scope("convnet"):
-            for num_outputs, kernel_size, stride in convs:
-                rgb0 = layers.convolution2d(rgb0,
-                                           num_outputs=num_outputs,
-                                           kernel_size=kernel_size,
-                                           stride=stride,
-                                           activation_fn=tf.nn.relu)
-                rgb0 = tf.layers.batch_normalization(rgb0)
-            for num_outputs, kernel_size, stride in convs:
-                rgb1 = layers.convolution2d(rgb1,
-                                           num_outputs=num_outputs,
-                                           kernel_size=kernel_size,
-                                           stride=stride,
-                                           activation_fn=tf.nn.relu)
-                rgb1 = tf.layers.batch_normalization(rgb1)
-        '''
-        '''
-            for num_outputs, kernel_size, stride in convs:
-                depth0 = layers.convolution2d(depth0,
-                                           num_outputs=num_outputs,
-                                           kernel_size=kernel_size,
-                                           stride=stride,
-                                           activation_fn=tf.nn.relu)
-                depth0 = tf.layers.batch_normalization(depth0)
-            for num_outputs, kernel_size, stride in convs:
-                depth1 = layers.convolution2d(depth1,
-                                           num_outputs=num_outputs,
-                                           kernel_size=kernel_size,
-                                           stride=stride,
-                                           activation_fn=tf.nn.relu)
-                depth1 = tf.layers.batch_normalization(depth1)
-            '''
-        #rgb1_out = tiny_yolo(rgb1)
-        #depth1_out = tiny_yolo(depth1)
-
-        #rgb0_out = layers.flatten(rgb0)
-        #rgb1_out = layers.flatten(rgb1)
-        #depth0_out = layers.flatten(depth0)
-        #depth1_out = layers.flatten(depth1)
-        #conv_out = tf.concat([rgb0_out, depth0_out], 1)
-
-        #conv_out = tf.concat([v, o, r, conv_out], 1)
-
-        #conv_out = tf.concat([rgb0_out, depth0_out, rgb1_out, depth1_out], axis=1)
-
-        #conv_out = layers.flatten(out)
+        ##rgbd = tf.reshape(rgbd, [-1, 288, 256, 4])
+        #rgbd = tf.reshape(rgbd, [-1, 144*QUEUE_LEN, 256, 4])
+        #rgbd_queue = tf.split(rgbd, [144]*QUEUE_LEN, 1)
+        #out_list = []
+        #for i in range(QUEUE_LEN):
+        #    rgbd = rgbd_queue[i]
+        #    tf.divide(rgbd, 256.0)
+        #    (rgb, depth) = tf.split(rgbd, [3, 1], 3)
+        #    rgb_out = tiny_yolo(rgb)
+        #    depth_out = tiny_yolo(depth)
+        #    out_list.append(rgb_out)
+        #    out_list.append(depth_out)
+        #conv_out = tf.concat(out_list, axis=1)
+        #conv_out = tf.concat([v, o, r, t, c, conv_out], 1)
         with tf.variable_scope("action_value"):
             action_out = conv_out
             for hidden in hiddens:

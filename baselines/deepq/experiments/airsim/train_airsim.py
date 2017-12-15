@@ -3,9 +3,10 @@ from baselines.common.atari_wrappers_deprecated import wrap_dqn, ScaledFloatFram
 import baselines.AirSimDiscPhys as AirSimDiscPhys
 from baselines.AirSimDisc import AirSimDisc
 from baselines.AirSimEnvFollow import AirSimEnv
+from baselines.AirSimPhysFollow import AirSimPhys
 
 def main():
-    env = AirSimEnv()
+    env = AirSimPhys()
     #env = AirSimDisc()
     #env = AirSimDiscPhys.AirSimEnv()
     #env = ScaledFloatFrame(wrap_dqn(env))
@@ -21,9 +22,10 @@ def main():
         lr=1e-4,
         max_timesteps=1000000,
         buffer_size=1000,
-        exploration_fraction=0.2,
+        exploration_fraction=0.1,
         exploration_final_eps=0.01,
         train_freq=4,
+        checkpoint_freq=1000,
         learning_starts=10000,
         target_network_update_freq=1000,
         gamma=0.99,

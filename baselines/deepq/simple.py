@@ -19,11 +19,24 @@ class ActWrapper(object):
         self._act_params = act_params
 
     @staticmethod
-    def load(path, num_cpu=16):
+    def load(path, q_func, env, num_cpu=16):
         with open(path, "rb") as f:
-            model_data, act_params = dill.load(f)
+            model_data = dill.load(f)
+
+        def make_obs_ph(name):
+            return U.BatchInput(env.observation_space.shape, name=name)
+        act_params = {
+            'make_obs_ph': make_obs_ph,
+            'q_func': q_func,
+            'num_actions': env.action_space.n,
+        }
         act = deepq.build_act(**act_params)
-        sess = U.make_session(num_cpu=num_cpu)
+
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6666667)
+
+        sess = U.make_session(num_cpu=num_cpu, gpu_opt=gpu_options)
+        #sess = U.make_session(num_cpu=num_cpu)
+
         sess.__enter__()
         with tempfile.TemporaryDirectory() as td:
             arc_path = os.path.join(td, "packed.zip")
@@ -52,10 +65,10 @@ class ActWrapper(object):
             with open(arc_name, "rb") as f:
                 model_data = f.read()
         with open(path, "wb") as f:
-            dill.dump((model_data, self._act_params), f)
+            dill.dump(model_data, f)
 
 
-def load(path, num_cpu=16):
+def load(path, q_func, env, num_cpu=16):
     """Load act function that was returned by learn function.
 
     Parameters
@@ -71,7 +84,7 @@ def load(path, num_cpu=16):
         function that takes a batch of observations
         and returns actions.
     """
-    return ActWrapper.load(path, num_cpu=num_cpu)
+    return ActWrapper.load(path, q_func, env, num_cpu=num_cpu)
 
 
 def learn(env,
@@ -165,10 +178,10 @@ def learn(env,
     """
     # Create all the functions necessary to train the model
 
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6666667)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.66666666)
 
     sess = U.make_session(num_cpu=num_cpu, gpu_opt=gpu_options)
-    #sess = U.make_session(num_cpu=num_cpu)
+    sess = U.make_session(num_cpu=num_cpu)
     sess.__enter__()
 
     def make_obs_ph(name):
@@ -213,6 +226,8 @@ def learn(env,
     saved_mean_reward = None
     obs = env.reset()
     reset = True
+    saver = tf.train.Saver()
+    #saver.restore(sess, "/tmp/tmpqqgj7b52/model")
     with tempfile.TemporaryDirectory() as td:
         model_saved = False
         model_file = os.path.join(td, "model")

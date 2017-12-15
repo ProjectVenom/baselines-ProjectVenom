@@ -17,7 +17,7 @@ class AirSimEnv(gym.Env):
     }
 
     def __init__(self, discrete=True):
-        this_port = 41451
+        this_port = 41450
         print(this_port)
 
         self.client = AirSimClient(port=this_port)
@@ -25,7 +25,7 @@ class AirSimEnv(gym.Env):
         self.client.enableApiControl(True)
         self.client.armDisarm(True)
 
-        self.target = AirSimClient(port=41450)
+        self.target = AirSimClient(port=41451)
         self.target.confirmConnection()
         self.target.enableApiControl(True)
         self.target.armDisarm(True)
@@ -167,11 +167,16 @@ class AirSimEnv(gym.Env):
         if self.image is None:
             return None
 
-        self.current_state = np.concatenate(list(self.image_queue))
-        self.current_state = (self.current_state.flatten())
+        #self.current_state = np.concatenate(list(self.image_queue))
+        #self.current_state = (self.current_state.flatten())
+        (x, y), target_in_front = projection(self.t, self.c, self.o, w=float(self.width), h=float(self.height))
+        pix = np.array((x/255.0,y/143.0)).flatten()
         self.current_state = np.concatenate([np.array(self.v).flatten()/(10.0/self.fps),
                                              np.array(self.o).flatten()/360.0,
                                              np.array(self.r).flatten()/360.0,
+                                             np.array(self.t).flatten()/30.0,
+                                             np.array(self.c).flatten()/30.0,
+                                             np.array(pix),
                                              self.current_state], 0)
 
         return self.current_state

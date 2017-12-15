@@ -25,6 +25,7 @@ class AirSimDisc(gym.Env):
         self.target.confirmConnection()
         self.target.enableApiControl(True)
         self.target.armDisarm(True)
+        self.log_freq = 10
         self.log_file = open('logs.txt', 'w')
         self.acc_file = open('accs.txt', 'w')
 
@@ -63,7 +64,7 @@ class AirSimDisc(gym.Env):
         # self.observation = np.concatenate([self.last_image, self.image])
         # self.action_space = spaces.Box(0.0, 1.0, shape = (4,))
         # self.action_space = spaces.Box(-0.5, 0.5, shape = (2,))
-        self.action_space = spaces.Discrete(10)
+        self.action_space = spaces.Discrete(9)
 
         # self.observation_space = spaces.Box(low=np.zeros(int(self.width),int(self.height),3), high=np.zeros(int(self.width),int(self.height),3)+255)
         self.observation_space = spaces.Box(low=np.zeros(self.observation.shape),
@@ -78,7 +79,7 @@ class AirSimDisc(gym.Env):
                            random.normalvariate(t.item(1), 10),
                            random.normalvariate(t.item(2), 5)])
             d = np.linalg.norm(t - c)
-            if d > 5 and d < 30 and c.item(2) < -2:
+            if d > 5 and d < 15 and c.item(2) < -2:
                 #    break
                 # while True:
                 # o = np.matrix([random.uniform(-180,180),
@@ -112,9 +113,9 @@ class AirSimDisc(gym.Env):
                 (x, y), target_in_front = projection(self.t, newC, newO, w=float(self.width),
                                                      h=float(self.height))
                 total_v = np.linalg.norm(dC)
-                if x <= float(self.width) * 1.1 and x >= float(self.width) * -0.1 and y <= float(
-                        self.height) * 1.1 and y >= float(self.height) * -0.1 \
-                        and d > 3 and d < 30 and newC.item(2) < -2 \
+                if x <= float(self.width) * 0.9 and x >= float(self.width) * 0.1 and y <= float(
+                        self.height) * 0.9 and y >= float(self.height) * 0.1 \
+                        and d > 3 and d < 15 and newC.item(2) < -2 \
                         and total_v * self.fps <= 10 \
                         and target_in_front:
                     break
@@ -180,6 +181,12 @@ class AirSimDisc(gym.Env):
         # y = self.c.item(1)/self.height
         # self.reward = 1-((np.linalg.norm(action-self.last_loc))/self.rt2)
         action = [int(raw_action % 3), int(raw_action / 3)]
+        #if self.last_loc[0] > 2 or self.last_loc[0] < 0 or self.last_loc[1] < 0 or self.last_loc[1] > 2:
+        #    if raw_action == 9:
+        #        self.reward = 1
+        #    else:
+        #        self.reward = 0
+        #else:
         self.reward = 1 - ((action[0] - self.last_loc[0]) ** 2 + (action[1] - self.last_loc[1]) ** 2)
         if self.reward == 1:
             self.nb_correct += 1
@@ -187,10 +194,13 @@ class AirSimDisc(gym.Env):
         self.iteration += 1
         # print(self.iteration)
 
-        if self.episodes % 500 == 0:
-            if self.fw is None:
-                self.fw = open('./images/episode_' + str(self.episodes) + '/actions.txt', 'w')
-            self.fw.write('(' + str(raw_action) + ')\n')
+        if self.episodes % self.log_freq == 0:
+            if self.act_log is None:
+                self.act_log = open('./images/episode_' + str(self.episodes) + '/actions.txt', 'w')
+            self.act_log.write('(' + str(raw_action) + ')\n')
+            if self.obs_log is None:
+                self.obs_log = open('./images/episode_' + str(self.episodes) + '/actions.txt', 'w')
+            self.obs_log.write('(' + str(raw_action) + ')\n')
 
         self.aT = np.matrix([random.normalvariate(mu=self.aT.item(0), sigma=2 / self.fps),
                              random.normalvariate(mu=self.aT.item(0), sigma=2 / self.fps),
@@ -208,9 +218,11 @@ class AirSimDisc(gym.Env):
             if j > 100:
                 self.done = True
 
-                if self.episodes % 500 == 0:
-                    self.fw.close()
-                    self.fw = None
+                if self.episodes % self.log_freq == 0:
+                    self.act_log.close()
+                    self.act_log = None
+                    self.obs_log.close()
+                    self.obs_log = None
                 self.episodes += 1
                 acc = float(self.nb_correct) / float(self.iteration)
                 print(str(self.episodes) + ': ' + str(self.cumulative / float(self.iteration)) + ' *' + str(
@@ -241,7 +253,7 @@ class AirSimDisc(gym.Env):
             total_v = np.linalg.norm(dC)
             if x <= float(self.width) * 0.95 and x >= float(self.width) * 0.05 and y <= float(
                     self.height) * 0.95 and y >= float(self.height) * 0.05 \
-                    and d > 3 and d < 30 and newC.item(2) < -2 \
+                    and d > 3 and d < 15 and newC.item(2) < -2 \
                     and total_v * self.fps <= 30 and target_in_front:
                 break
             j += 1
@@ -264,9 +276,11 @@ class AirSimDisc(gym.Env):
         # print(np.matrix([x,y]))
         # print(self.reward)
         if self.done:
-            if self.episodes % 500 == 0:
-                self.fw.close()
-                self.fw = None
+            if self.episodes % self.log_freq == 0:
+                self.act_log.close()
+                self.act_log = None
+                self.obs_log.close()
+                self.obs_log = None
             self.episodes += 1
             acc = float(self.nb_correct) / float(self.iteration)
             print(str(self.episodes) + ': ' + str(self.cumulative / float(self.iteration)))
@@ -293,7 +307,8 @@ class AirSimDisc(gym.Env):
         #                       self.hunter.toQuaternion(math.radians(self.o.item(1)), math.radians(self.o.item(0)),
         #                                                math.radians(self.o.item(2))))
         self.image = None
-        self.fw = None
+        self.act_log = None
+        self.obs_log = None
         # response = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.Scene)])[0]
         # self.image = self.get_rbg(response)
 
@@ -323,12 +338,12 @@ class AirSimDisc(gym.Env):
         #self.last_image = self.image
         responses = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.Scene),
                                               ImageRequest(0, AirSimImageType.DepthVis)])
-        #if self.episodes % 500 == 0:
-        #    if not os.path.exists('./images/episode_' + str(self.episodes) + '/'):
-        #        os.makedirs('./images/episode_' + str(self.episodes) + '/')
-        #    AirSimClient.write_file(
-        #        os.path.normpath('./images/episode_' + str(self.episodes) + '/' + str(self.iteration) + '.png'),
-        #        responses[0].image_data_uint8)
+        if self.episodes % self.log_freq == 0:
+            if not os.path.exists('./images/episode_' + str(self.episodes) + '/'):
+                os.makedirs('./images/episode_' + str(self.episodes) + '/')
+            AirSimClient.write_file(
+                os.path.normpath('./images/episode_' + str(self.episodes) + '/' + str(self.iteration) + '.png'),
+                responses[0].image_data_uint8)
         rgb = self.get_rbg(responses[0])
         # response = self.hunter.simGetImages([ImageRequest(0, AirSimImageType.DepthVis)])[0]
         depth = self.get_depth(responses[1])

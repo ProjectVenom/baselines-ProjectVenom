@@ -1,39 +1,30 @@
 from baselines.PythonClient import *
 import time
-hunter = AirSimClient(port=41451)
-hunter.confirmConnection()
-hunter.enableApiControl(True)
-hunter.armDisarm(True)
-# hunter.takeoff()
-hunter.simSetPose(Vector3r(-20, 10, -10), hunter.toQuaternion(0, 0, 0))
-hunter.moveByVelocity(0,0,0.1,0.1)
-time.sleep(5)
-for j in range(1):
-    for i in range(50000):
-        hunter.moveByVelocity(-5, 0, 0, 100)
-        print((hunter.getVelocity().x_val,
-                  hunter.getVelocity().y_val,
-                  hunter.getVelocity().z_val))
-    for i in range(50000):
-        hunter.moveByVelocity(0, -5, 0, 100)
-        print((hunter.getVelocity().x_val,
-                  hunter.getVelocity().y_val,
-                  hunter.getVelocity().z_val))
-    for i in range(50000):
-        hunter.moveByVelocity(5, 0, 0, 100)
-        print((hunter.getVelocity().x_val,
-                  hunter.getVelocity().y_val,
-                  hunter.getVelocity().z_val))
-    for i in range(50000):
-        hunter.moveByVelocity(0, 5, 0, 100)
-        print((hunter.getVelocity().x_val,
-                  hunter.getVelocity().y_val,
-                  hunter.getVelocity().z_val))
-    for i in range(20000):
-        hunter.moveByVelocity(0, 0, 0, 0.01)
-        print((hunter.getVelocity().x_val,
-                  hunter.getVelocity().y_val,
-                  hunter.getVelocity().z_val))
-    print((hunter.getPosition().x_val,
-          hunter.getPosition().y_val,
-          hunter.getPosition().z_val))
+import gym
+
+from baselines import deepq
+from baselines.common.atari_wrappers_deprecated import wrap_dqn, ScaledFloatFrame
+
+from baselines.AirSimDisc import AirSimDisc
+#from baselines.AirSimEnvFollow import AirSimEnv
+
+def main():
+    env = AirSimDisc()
+    model = deepq.models.cnn_to_mlp_custom(
+        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],
+        hiddens=[4096, 4096, 4096],
+        dueling=True
+    )
+    act = deepq.load("airsim_model.pkl", model, env)
+
+    while True:
+        obs, done = env.reset(), False
+        episode_rew = 0
+        while not done:
+            obs, rew, done, _ = env.step(act(obs[None])[0])
+            episode_rew += rew
+        print("Episode reward", episode_rew)
+
+
+if __name__ == '__main__':
+    main()
